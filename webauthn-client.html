@@ -1,0 +1,103 @@
+<link rel="import" href="bower_components/polymer/polymer.html">
+<script src="bower_components/swagger-js/browser/swagger-client.js"></script>
+<!--
+`webauthn-client`
+A relying party application for FIDO 2.0 / WebAuthn
+
+@demo demo/index.html
+-->
+<dom-module id="webauthn-client">
+    <template>
+        <style>
+        :host {
+            display: block;
+        }
+        </style>
+        <h2>Host [[serverUrl]]</h2>
+        <h2>Port [[serverPort]]</h2>
+    </template>
+    <script>
+    Polymer({
+
+        is: 'webauthn-client',
+
+        properties: {
+            // the full URL for the swagger.json file
+            swaggerUrl: {
+                type: String
+            },
+
+            // The hostname:port for the FIDO server
+            serverUrl: {
+                type: String,
+                observer: "_serverUrlChanged"
+            },
+
+            // The hostname for the FIDO server, parsed from serverUrl
+            serverHost: String,
+
+            // The port for the FIDO server, parsed from serverUrl
+            serverPort: {
+                type: Number,
+                value: 0xF1D0,
+            },
+            // CONFIG:
+
+            // server basepath
+            // register-challenge path
+            // register path
+            // auth-challenge path
+            // auth path
+        },
+
+        _serverUrlChanged: function(serverUrl) {
+            console.log("serverUrl changed: " + serverUrl);
+            var regexpStr =
+                "(?:http[s]?:\/\/)" + // if the string starts with http:// or https:// ignore that part
+                "?([^:\/\s]+)" + // gather up the part up to the next "/" or ":", that's the hostname
+                "(?::([0-9]+))?"; // if there's a ":number" part, grab the number for the port
+            var regex = new RegExp(regexpStr);
+            var str = "http://webauthn.org:80/";
+            var match = regex.exec(str);
+            var hostname = match[1];
+            var port = match[2];
+            console.log("host: " + hostname);
+            console.log("port: " + port);
+            if (hostname) this.serverHost = hostname;
+            if (port) this.serverPort = port;
+        },
+
+        attached: function() {
+            // TODO: validate config
+            console.log("attached: " + this.localName + '#' + this.id);
+            console.log("SwaggerClient:", SwaggerClient);
+
+            var client = new SwaggerClient({
+                url: 'http://petstore.swagger.io/v2/swagger.json',
+                success: function() {
+                    client.pet.getPetById({
+                        petId: 7
+                    }, {
+                        responseContentType: 'application/json'
+                    }, function(pet) {
+                        console.log('pet', pet);
+                    });
+                }
+            });
+        },
+
+        // create a new account on the FIDO server
+        register: function(userId) {
+            console.log (`doing register for ${userId}...`);
+        },
+
+        // login to an existing account on the FIDO server
+        authn: function(userId) {
+            console.log (`doing authn for ${userId}...`);
+        }
+
+        // grab swagger JSON
+        // fire webauth-client-ready
+    });
+    </script>
+</dom-module>

@@ -1,0 +1,27 @@
+{
+  "name": "polymer-webauthn-client",
+  "version": "0.7.0",
+  "description": "A polymer relying party application for FIDO 2.0 / WebAuthn",
+  "main": "index.js",
+  "scripts": {
+    "test": "wct -l chrome -p"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/apowers313/polymer-webauthn-client.git"
+  },
+  "keywords": [
+    "polymer",
+    "fido",
+    "fido2",
+    "webauthn",
+    "auth",
+    "authn"
+  ],
+  "author": "Adam Powers <apowers@ato.ms>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/apowers313/polymer-webauthn-client/issues"
+  },
+  "homepage": "https://github.com/apowers313/polymer-webauthn-client#readme"
+}
