@@ -72,32 +72,62 @@ A relying party application for FIDO 2.0 / WebAuthn
             console.log("attached: " + this.localName + '#' + this.id);
             console.log("SwaggerClient:", SwaggerClient);
 
-            var client = new SwaggerClient({
-                url: 'http://petstore.swagger.io/v2/swagger.json',
-                success: function() {
-                    client.pet.getPetById({
-                        petId: 7
-                    }, {
-                        responseContentType: 'application/json'
-                    }, function(pet) {
-                        console.log('pet', pet);
-                    });
-                }
-            });
+            this._swaggerClient = new SwaggerClient({
+                    url: 'http://localhost:61904/api/authn/fido/v1/swagger',
+                    usePromise: true
+                })
+                .then((client) => {
+                    // this._swaggerClient.pet.getPetById({
+                    //     petId: 7
+                    // }, {
+                    //     responseContentType: 'application/json'
+                    // }, function(pet) {
+                    //     console.log('pet', pet);
+                    // });
+                    console.log("success setting up swagger client");
+                    console.log("_swaggerClient:", this._swaggerClient);
+                    this._client = client;
+                    console.log("client:", client);
+                    this.register("adam");
+                })
+                .catch((err) => {
+                    console.log(err);
+                });
         },
 
         // create a new account on the FIDO server
         register: function(userId) {
-            console.log (`doing register for ${userId}...`);
+            console.log("register");
+            console.log(`doing register for ${userId}...`);
+            var msg = {
+                "header": {
+                    "op": "Reg",
+                    "version": {
+                        "major": 2,
+                        "minor": 0
+                    },
+                    "appID": "string",
+                    "serverData": "string"
+                },
+                "userId": userId
+            };
+            this._client.register.register({msg: msg})
+                .then((resp) => {
+                    console.log ("Got response:", resp);
+                    // return makeCredential (resp.obj.challenge)
+                });
         },
 
         // login to an existing account on the FIDO server
         authn: function(userId) {
-            console.log (`doing authn for ${userId}...`);
+            console.log(`doing authn for ${userId}...`);
         }
 
         // grab swagger JSON
         // fire webauth-client-ready
+
+        /* JSHINT */
+        /* globals SwaggerClient */
     });
     </script>
 </dom-module>
