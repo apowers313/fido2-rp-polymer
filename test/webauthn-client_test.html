@@ -1,32 +1,167 @@
 <!doctype html>
-
 <html>
-  <head>
+
+<head>
     <title>webauthn-client test</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1, user-scalable=yes">
-    <script src="../../webcomponentsjs/webcomponents-lite.js"></script>
+    <script src="../../webcomponentsjs/webcomponents.js"></script>
     <script src="../../web-component-tester/browser.js"></script>
-
+    <script src="helpers/helpers.js"></script>
     <link rel="import" href="../webauthn-client.html">
-  </head>
-  <body>
+</head>
 
+<body>
     <test-fixture id="basic">
-      <template>
-        <webauthn-client server-url="webauthn.org:1111"></webauthn-client>
-      </template>
+        <template>
+            <webauthn-client server-url="webauthn.org:1111"></webauthn-client>
+        </template>
     </test-fixture>
-
     <script>
-      suite('webauthn-client', function() {
-
-        test('instantiating the element works', function() {
-          var element = fixture('basic');
-          assert.equal(element.is, 'webauthn-client');
+    /* JSHINT: */
+    /* globals describe, it, fixture, before, after, sinon, registerChallengeResponse, registerResponse, authnChallengeResponse, authnResponse, swaggerJson */
+    describe("basic tests", function() {
+        var server;
+        before(function() {
+            server = sinon.fakeServer.create();
+            server.autoRespond = true;
+            server.autoRespondAfter = 0;
+            server.respondWith("GET", /\/swagger$/, swaggerJson);
+            server.respondWith("POST", /\/register-challenge$/, registerChallengeResponse);
+            server.respondWith("POST", /\/register$/, registerResponse);
+            server.respondWith("POST", /\/authn-challenge$/, authnChallengeResponse);
+            server.respondWith("POST", /\/authn$/, authnResponse);
         });
 
-      });
+        after(function() {
+            server.restore();
+        });
+
+        it("instantiating the element works", function() {
+            var element = fixture("basic");
+            assert.equal(element.is, "webauthn-client");
+        });
+
+        it.only("will parse host.com correctly", function(done) {
+            var element = fixture("basic");
+
+            function oneTime(e) {
+                e.target.removeEventListener(e.type, this);
+                assert.equal(element.serverHost, "host.com");
+                done();
+                done = function() {}; // for bubbling and what-not
+            }
+            element.addEventListener("server-host-changed", oneTime);
+            element.serverUrl = "host.com";
+        });
+
+        it.only("will parse host.com:8888 correctly", function(done) {
+            var element = fixture("basic");
+
+            function oneTime(e) {
+                e.target.removeEventListener(e.type, this);
+                assert.equal(element.serverHost, "host.com");
+                assert.equal(element.serverPort, "8888");
+                done();
+                done = function() {}; // for bubbling and what-not
+            }
+            element.addEventListener("server-host-changed", oneTime);
+            element.serverUrl = "host.com:8888";
+        });
+
+        it.only("will parse http://server.com:8888 correctly", function(done) {
+            var element = fixture("basic");
+
+            function oneTime(e) {
+                e.target.removeEventListener(e.type, this);
+                assert.equal(element.serverHost, "server.com");
+                assert.equal(element.serverPort, "8888");
+                done();
+                done = function() {}; // for bubbling and what-not
+            }
+            element.addEventListener("server-host-changed", oneTime);
+            element.serverUrl = "http://server.com:8888";
+        });
+
+        it.only("will parse https://server.com:8888 correctly", function(done) {
+            var element = fixture("basic");
+
+            function oneTime(e) {
+                e.target.removeEventListener(e.type, this);
+                assert.equal(element.serverHost, "server.com");
+                assert.equal(element.serverPort, "8888");
+                done();
+                done = function() {}; // for bubbling and what-not
+            }
+            element.addEventListener("server-host-changed", oneTime);
+            element.serverUrl = "https://server.com:8888";
+        });
+
+        it.only("will parse https://server.com:8888/path/to/thing correctly", function(done) {
+            var element = fixture("basic");
+
+            function oneTime(e) {
+                e.target.removeEventListener(e.type, this);
+                assert.equal(element.serverHost, "server.com");
+                assert.equal(element.serverPort, "8888");
+                done();
+                done = function() {}; // for bubbling and what-not
+            }
+            element.addEventListener("server-host-changed", oneTime);
+            element.serverUrl = "https://server.com:8888/path/to/thing";
+        });
+
+        it("will accept a swaggerUrl");
+        it("will use host / port from swaggerUrl");
+        it("will calculate host / port from swaggerUrl if none set");
+
+        it ("register returns promise"); // swagger-js currently uses Q, not Promise
+        // it ("register returns promise", function() {
+        //     var element = fixture("basic");
+        //     var ret = element.register("testuser");
+        //     assert.instanceOf (ret, Promise);
+        // });
+
+        it ("authn returns promise"); // swagger-js currently uses Q, not Promise
+        // it ("authn returns promise", function() {
+        //     var element = fixture("basic");
+        //     var ret = element.authn("testuser");
+        //     assert.instanceOf (ret, Promise);
+        // });
+
+        it("can call register", function() {
+            var element = fixture("basic");
+            return element.register("testuser");
+        });
+
+        it("can call authn", function() {
+            var element = fixture("basic");
+            return element.authn("testuser");
+        });
+    });
+
+    describe("test init", function() {
+        var server;
+        before(function() {
+            server = sinon.fakeServer.create();
+            server.autoRespond = true;
+            server.autoRespondAfter = 0;
+            server.respondWith("GET", /\/swagger$/, swaggerJson);
+            server.respondWith("POST", /\/register-challenge$/, registerChallengeResponse);
+            server.respondWith("POST", /\/register$/, registerResponse);
+            server.respondWith("POST", /\/authn-challenge$/, authnChallengeResponse);
+            server.respondWith("POST", /\/authn$/, authnResponse);
+        });
+
+        it("does init", function() {
+            // WCT.waitForFrameworks = false;
+            var element = fixture("basic");
+            return element._swaggerInit();
+        });
+
+        it("won't init multiple times");
+    });
     </script>
-  </body>
+</body>
+
 </html>

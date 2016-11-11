@@ -17,6 +17,22 @@ A relying party application for FIDO 2.0 / WebAuthn
         <h2>Port [[serverPort]]</h2>
     </template>
     <script>
+    class FidoMsg {
+        constructor(op) {
+            var msg = {
+                "header": {
+                    "op": op,
+                    "version": {
+                        "major": 2,
+                        "minor": 0
+                    }
+                }
+            };
+
+            return msg;
+        }
+    }
+
     Polymer({
 
         is: 'webauthn-client',
@@ -24,107 +40,185 @@ A relying party application for FIDO 2.0 / WebAuthn
         properties: {
             // the full URL for the swagger.json file
             swaggerUrl: {
-                type: String
+                type: String,
+                notify: true
             },
 
             // The hostname:port for the FIDO server
             serverUrl: {
                 type: String,
-                observer: "_serverUrlChanged"
+                observer: "_serverUrlChanged",
+                notify: true
             },
 
             // The hostname for the FIDO server, parsed from serverUrl
-            serverHost: String,
+            serverHost: {
+                type: String,
+                notify: true
+            },
 
             // The port for the FIDO server, parsed from serverUrl
             serverPort: {
                 type: Number,
                 value: 0xF1D0,
+                notify: true
             },
-            // CONFIG:
 
-            // server basepath
-            // register-challenge path
-            // register path
-            // auth-challenge path
-            // auth path
+            auto: {
+                type: Boolean,
+                value: false
+            }
         },
 
         _serverUrlChanged: function(serverUrl) {
-            console.log("serverUrl changed: " + serverUrl);
             var regexpStr =
-                "(?:http[s]?:\/\/)" + // if the string starts with http:// or https:// ignore that part
-                "?([^:\/\s]+)" + // gather up the part up to the next "/" or ":", that's the hostname
+                "(?:http[s]?:\/\/)?" + // if the string starts with http:// or https:// ignore that part
+                "([^:\/]+)" + // gather up the part up to the next "/" or ":", that's the hostname
                 "(?::([0-9]+))?"; // if there's a ":number" part, grab the number for the port
             var regex = new RegExp(regexpStr);
-            var str = "http://webauthn.org:80/";
-            var match = regex.exec(str);
+            var match = regex.exec(serverUrl);
             var hostname = match[1];
             var port = match[2];
-            console.log("host: " + hostname);
-            console.log("port: " + port);
-            if (hostname) this.serverHost = hostname;
-            if (port) this.serverPort = port;
+            if (port) {
+                this.serverPort = port;
+                this.notifyPath("serverPort");
+            }
+            if (hostname) {
+                // this.serverHost = hostname;
+                this.set("serverHost", hostname);
+                this.fire("server-host-changed");
+            }
+        },
+
+        _swaggerInit() {
+            console.log ("**** SWAGGER INIT");
+            if (!this._swaggerClient) {
+                this._swaggerClient = new SwaggerClient({
+                    url: 'http://localhost:61904/api/authn/fido/v1/swagger',
+                    usePromise: true
+                });
+            }
+
+            return this._swaggerClient.then((client) => {
+                this.fire ("webauthn-client-ready");
+                return client;
+            });
         },
 
         attached: function() {
             // TODO: validate config
-            console.log("attached: " + this.localName + '#' + this.id);
-            console.log("SwaggerClient:", SwaggerClient);
-
-            this._swaggerClient = new SwaggerClient({
-                    url: 'http://localhost:61904/api/authn/fido/v1/swagger',
-                    usePromise: true
-                })
-                .then((client) => {
-                    // this._swaggerClient.pet.getPetById({
-                    //     petId: 7
-                    // }, {
-                    //     responseContentType: 'application/json'
-                    // }, function(pet) {
-                    //     console.log('pet', pet);
-                    // });
-                    console.log("success setting up swagger client");
-                    console.log("_swaggerClient:", this._swaggerClient);
-                    this._client = client;
-                    console.log("client:", client);
-                    this.register("adam");
-                })
-                .catch((err) => {
-                    console.log(err);
-                });
+            if (this.auto) {
+                this._swaggerInit();
+            }
         },
 
         // create a new account on the FIDO server
         register: function(userId) {
-            console.log("register");
-            console.log(`doing register for ${userId}...`);
-            var msg = {
-                "header": {
-                    "op": "Reg",
-                    "version": {
-                        "major": 2,
-                        "minor": 0
-                    },
-                    "appID": "string",
-                    "serverData": "string"
-                },
-                "userId": userId
-            };
-            this._client.register.register({msg: msg})
-                .then((resp) => {
-                    console.log ("Got response:", resp);
-                    // return makeCredential (resp.obj.challenge)
+            var _client;
+            return this._swaggerInit()
+                .then((client) => { // get registration challenge
+                    _client = client;
+                    var msg = new FidoMsg("Reg");
+                    msg.userId = userId;
+                    return client.register.registerChallenge({
+                        msg: msg
+                    });
+                })
+                .then(() => { // sign registration challege via makeCredential()
+                    // return makeCredential (resp.obj.challenge, options)
+                    // TODO: this is should really be the return from makeCredential
+                    return {
+                        credential: {
+                            type: 'ScopedCred',
+                            id: '8DD7414D-EE43-474C-A05D-FDDB828B663B'
+                        },
+                        publicKey: {
+                            kty: 'RSA',
+                            alg: 'RS256',
+                            ext: false,
+                            n: 'lMR4XoxRiY5kptgHhh1XLKnezHC2EWPIImlHS-iUMSKVH32WWUKfEoY5Al_exPtcVuUfcNGtMoysAN65PZzcMKXaQ-2a8AebKwe8qQGBc4yY0EkP99Sgb80rAf1S7s-JRNVtNTRb4qrXVCMxZHu3ubjsdeybMI-fFKzYg9IV6DPotJyx1OpNSdibSwWKDTc5YzGfoOG3vA-1ae9oFOh5ZolhHnr5UkodFKUaxOOHfPrAB0MVT5Y5Stvo_Z_1qFDOLyOWdhxxzl2at3K9tyQC8kgJCNKYsq7-EFzvA9Q90PC6SxGATQoICKn2vCNMBqVHLlTydBmP7-8MoMxefM277w',
+                            e: 'AQAB'
+                        },
+                        attestation: null
+                    };
+                })
+                .then((cred) => { // send credential from makeCredential to create account on server
+                    var msg = new FidoMsg("Reg");
+                    // TODO: make into function / class
+                    msg.userId = userId;
+                    msg.scopedCredential = {};
+                    msg.scopedCredential.credential = {};
+                    msg.scopedCredential.credential.type = cred.credential.type;
+                    msg.scopedCredential.credential.id = cred.credential.id; // TODO: base64url encode
+                    msg.scopedCredential.publicKey = {};
+                    msg.scopedCredential.attestation = {};
+                    msg.scopedCredential.attestation.format = cred.attestation?cred.attestation.format:"null";
+                    msg.scopedCredential.attestation.clientData = cred.attestation?cred.attestation.clientData:"null"; // TODO: fix and base64url encode
+                    msg.scopedCredential.attestation.authenticatorData = cred.attestation?cred.attestation.authenticatorData:"null"; // TODO: fix and base64url encode
+                    msg.scopedCredential.attestation.authenticatorData = cred.attestation?cred.attestation.authenticatorData:{}; // TODO: fix and base64url encode
+
+                    return _client.register.register({
+                        msg: cred
+                    });
+                })
+                .then(() => {
+                    return true;
+                })
+                .catch((err) => {
+                    console.log(err);
+                    return false;
                 });
         },
 
         // login to an existing account on the FIDO server
         authn: function(userId) {
-            console.log(`doing authn for ${userId}...`);
-        }
+            var _client;
+            return this._swaggerInit()
+                .then((client) => {
+                    _client = client;
+                    var msg = new FidoMsg("Authn");
+                    msg.userId = userId;
+                    return _client.authn.authnChallenge({
+                        msg: msg
+                    });
+                })
+                .then(() => {
+                    // getAttestation (resp.challenge, options);
+                    return {
+                        credential: {
+                            type: 'ScopedCred',
+                            id: '8DD7414D-EE43-474C-A05D-FDDB828B663B'
+                        },
+                        clientData: 'ew0KCSJjaGFsbGVuZ2UiIDogImFiYzEyM2RlZjQ1NiINCn0A',
+                        authenticatorData: 'AQAAAAA',
+                        signature: 'g22nh1Ww-qZAysuizkugZGmEisax3dtoUNzIl2LWOSARzeZxm_-nQoHfKyo8b8_XnxXwuLlW8RXBLAN38D3V2PBugPRloVzE1gn4Vl7Ro124GqPyURNllvNkD3EAl64bHPK-EVIOmI8zk0QK_ZoqfAKY_RfMLNObSn47H_hdA-YZUGEkWtcyUgC65H9xfhFWOQdg-r_pHY5_TxgdSNR8itkBb2xZGKagFnGUtdmOSRROVwK9AalJwsJD1W4lF5_4Jfumsb1YJ6yQwrPhJuYNCCeVHXIahXDUKTdTtWQs0MTj7kGi1j-_lkNpl7rEnSV4wqw8K5SEcHM-mEBYX-fMDw'
+                    };
+                })
+                .then((assertion) => {
+                    var msg = new FidoMsg("Authn");
+                    // TODO: make into function / class
+                    msg.userId = userId;
+                    msg.assertion = {};
+                    msg.assertion.credential = {};
+                    msg.assertion.credential.type = assertion.credential.type;
+                    msg.assertion.credential.id = assertion.credential.id; // TODO: base64url encode
+                    msg.assertion.clientData = assertion.clientData; // TODO: base64url encode
+                    msg.assertion.authenticatorData = assertion.authenticatorData; // TODO: base64url encode
+                    msg.assertion.signature = assertion.signature; // TODO: base64url encode
 
-        // grab swagger JSON
-        // fire webauth-client-ready
+                    return _client.authn.authn({
+                        msg: msg
+                    });
+                })
+                .then(() => {
+                    return true;
+                })
+                .catch((err) => {
+                    console.log(err);
+                    setTimeout(function() { throw err; });
+                    return false;
+                });
+        }
 
         /* JSHINT */
         /* globals SwaggerClient */
